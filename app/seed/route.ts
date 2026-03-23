@@ -1,10 +1,10 @@
-import bcrypt from 'bcrypt';
-import postgres from 'postgres';
-import { invoices, customers, revenue, users } from '../lib/placeholder-data';
+import bcrypt from "bcryptjs";
+import postgres, { type Sql } from "postgres";
+import { invoices, customers, revenue, users } from "../lib/placeholder-data";
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: "require" });
 
-async function seedUsers() {
+async function seedUsers(sql: Sql) {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
   await sql`
     CREATE TABLE IF NOT EXISTS users (
@@ -25,11 +25,13 @@ async function seedUsers() {
       `;
     }),
   );
-
+  console.log(`✅ Inserted ${insertedUsers.length} users`);
+  const result = await sql`SELECT COUNT(*) FROM users`;
+  console.log(`👤 Total users in DB: ${result[0].count}`);
   return insertedUsers;
 }
 
-async function seedInvoices() {
+async function seedInvoices(sql: Sql) {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
   await sql`
@@ -52,10 +54,11 @@ async function seedInvoices() {
     ),
   );
 
+  console.log(`✅ Inserted ${insertedInvoices.length} invoices`);
   return insertedInvoices;
 }
 
-async function seedCustomers() {
+async function seedCustomers(sql: Sql) {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
   await sql`
@@ -77,10 +80,11 @@ async function seedCustomers() {
     ),
   );
 
+  console.log(`✅ Inserted ${insertedCustomers.length} customers`);
   return insertedCustomers;
 }
 
-async function seedRevenue() {
+async function seedRevenue(sql: Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS revenue (
       month VARCHAR(4) NOT NULL UNIQUE,
@@ -98,19 +102,22 @@ async function seedRevenue() {
     ),
   );
 
+  console.log(`✅ Inserted ${insertedRevenue.length} revenue entries`);
   return insertedRevenue;
 }
 
 export async function GET() {
   try {
-    const result = await sql.begin((sql) => [
-      seedUsers(),
-      seedCustomers(),
-      seedInvoices(),
-      seedRevenue(),
-    ]);
+    await sql.begin((sql) =>
+      Promise.all([
+        seedUsers(sql),
+        seedCustomers(sql),
+        seedInvoices(sql),
+        seedRevenue(sql),
+      ]),
+    );
 
-    return Response.json({ message: 'Database seeded successfully' });
+    return Response.json({ message: "Database seeded successfully" });
   } catch (error) {
     return Response.json({ error }, { status: 500 });
   }
